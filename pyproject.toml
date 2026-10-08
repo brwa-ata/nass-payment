@@ -1,6 +1,6 @@
 [project]
 name = "nass-payment"
-version = "0.1.1"
+version = "0.1.2"
 description = "Nass Payment Gateway for Django: card payments on Nass's 3-D Secure page that complete a receipt once Nass confirms them."
 readme = "README.md"
 authors = [

@@ -133,11 +133,24 @@ only right if Django knows it is behind HTTPS (`SECURE_PROXY_SSL_HEADER`) and
 sees the public host; otherwise Nass is given an `http://` or internal
 address.
 
-**Nass refuses `localhost`.** It answers `422 backRef must be a URL address`
-for a callback or return URL whose host is `localhost`. An IP address is
-accepted, so in local development run the backend and the site on
-`127.0.0.1` (the callback cannot reach your machine anyway; polling the
-status completes the payment).
+**Both URLs must be public, also in local development.** Nass refuses a
+`localhost` URL outright (`422 backRef must be a URL address`), and worse, it
+*accepts* `127.0.0.1` or a private IP when the transaction is created, then
+the customer's payment fails at "Pay Now" on Nass's card page with a
+"404 Not Found!" page. The package therefore refuses any return or callback
+URL that is not a public address, with a `NassError` that says so.
+
+When testing on your own machine, point both settings at public addresses:
+
+```bash
+NASS_RETURN_URL=https://shop.example/payment/return
+NASS_CALLBACK_URL=https://api.shop.example/api/nass/callback/
+```
+
+The callback then goes to that server instead of yours (a public server
+that answers `404` is fine), so the payment is completed on your machine by
+polling the status. After paying, the customer lands on the public return
+page; your own tab, still polling, sees the payment.
 
 ### 4. Point the app at your receipt model
 
@@ -395,8 +408,15 @@ What the UAT gateway actually does, where the manual is silent or differs:
   `data.transactionParams` echoes what Nass signed.
 - `orderId` must be digits only (`422 orderId must contain only numbers`) and
   never reused (`409 Transaction with this Order ID already exists`).
-- `backRef` and `notifyUrl` must be URLs with a real host or an IP address;
-  `localhost` is refused (`422`).
+- `backRef` and `notifyUrl` must be public addresses. `localhost` is refused
+  at create (`422`); `127.0.0.1` or a private IP is accepted at create but
+  makes the payment fail at "Pay Now" (`cgi-bin/cgi_link` answers `500` with
+  a "404 Not Found!" page). A public host answering `404` works.
+- After paying, the customer is sent to `backRef` with
+  `?status=success&orderId=...&amount=...&rrn=...` appended. Only a status
+  read from Nass counts; never complete anything from these parameters.
+- A paid status also carries `nonce` and a `signature`, which the manual does
+  not mention.
 - An unpaid transaction's status is `actionCode` `3`, `responseCode` `-24`;
   an unknown order answers `404 Transaction not found.`
 - A refusal's reason is `data.message`, or `data.<field>: [problems]`; a bad

@@ -31,15 +31,17 @@ negative code is not a failure by itself; :func:`transaction_state` reads it.
 """
 
 import base64
+import ipaddress
 import json
 import re
 import threading
 import time
 from decimal import ROUND_HALF_UP, Decimal
+from urllib.parse import urlsplit
 
 import requests
 
-from .exceptions import NassAPIError, NassAuthError
+from .exceptions import NassAPIError, NassAuthError, NassError
 
 DEFAULT_TIMEOUT = 30
 # ISO 4217 numeric code of the Iraqi dinar, the only currency Nass takes
@@ -50,6 +52,9 @@ TRANSACTION_PURCHASE = '1'
 MAX_DESCRIPTION = 119
 # Nass: digits only, "more than 8 and less than 32 digits long"
 ORDER_ID_PATTERN = re.compile(r'\d{9,31}')
+
+# host suffixes no server on the internet can reach
+LOCAL_SUFFIXES = ('.localhost', '.local', '.test', '.internal', '.lan')
 
 # how long to trust a token whose lifetime cannot be read from it
 DEFAULT_TOKEN_LIFETIME = 600
@@ -180,12 +185,24 @@ class NassPaymentClient:
         ``order_id`` is ours: 9 to 31 digits, never used before. ``return_url``
         is where Nass's page sends the customer afterwards (Nass's
         ``backRef``) and ``callback_url`` where Nass posts the result
-        (``notifyUrl``); Nass refuses both unless they are URLs with a real
-        host or an IP address, so not ``localhost``.
+        (``notifyUrl``). Both must be public addresses, also when testing
+        locally: a ``localhost`` or ``127.0.0.1`` one makes the payment fail
+        on Nass's card page, so it is refused here with a ``NassError``.
 
         Answer keys: ``url`` (the 3-D Secure page to send the customer to),
         ``pSign`` and ``transactionParams``.
         """
+        for name, url in (('return_url', return_url), ('callback_url', callback_url)):
+            if is_local_url(url):
+                # Nass creates the transaction, then its card page fails at
+                # "Pay Now" with a "404 Not Found!" page
+                raise NassError(
+                    f'Nass cannot complete a payment whose {name} is not a '
+                    f'public address: {url}. Use a public URL (the '
+                    'NASS_RETURN_URL / NASS_CALLBACK_URL settings), also when '
+                    'testing locally.'
+                )
+
         order_id = str(order_id)
         if not ORDER_ID_PATTERN.fullmatch(order_id):
             raise ValueError(f'A Nass orderId is 9 to 31 digits, not {order_id!r}.')
@@ -210,6 +227,23 @@ class NassPaymentClient:
         return _answer(
             self._request('GET', self._url('transaction', order_id, 'checkStatus'))
         )
+
+
+def is_local_url(url):
+    """Whether ``url`` points somewhere Nass's servers cannot reach:
+    ``localhost``, a local-only domain, or a loopback / private IP address.
+
+    Nass takes such a URL when the transaction is created, and the payment
+    then fails on its card page; a public host that answers ``404`` is fine.
+    """
+    host = (urlsplit(str(url or '')).hostname or '').lower()
+    if host == 'localhost' or host.endswith(LOCAL_SUFFIXES):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified
 
 
 def transaction_state(data):

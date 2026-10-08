@@ -19,7 +19,7 @@ from nass_payment.client import (
     NassPaymentClient,
     transaction_state,
 )
-from nass_payment.exceptions import NassAPIError, NassAuthError
+from nass_payment.exceptions import NassAPIError, NassAuthError, NassError
 
 from .conftest import DECLINED, UNPAID
 from .conftest import PAID as PAID_STATUS
@@ -269,6 +269,49 @@ def test_an_order_id_nass_would_refuse_is_never_sent(order_id):
         )
 
     req.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ('return_url', 'callback_url'),
+    [
+        # what UAT broke on: its card page answered "404 Not Found!" at Pay Now
+        ('https://shop.example/return', 'http://127.0.0.1:8000/api/nass/callback/'),
+        ('http://127.0.0.1:3001/payment/return', 'https://shop.example/cb/'),
+        ('http://localhost:3000/payment/return', 'https://shop.example/cb/'),
+        ('https://shop.example/return', 'http://192.168.1.20/cb/'),
+        ('https://shop.example/return', 'http://[::1]:8000/cb/'),
+        ('https://lavender.test/return', 'https://shop.example/cb/'),
+    ],
+)
+def test_a_url_nass_cannot_reach_is_refused_before_anything_is_sent(
+    return_url, callback_url
+):
+    with (
+        patch('nass_payment.client.requests.request') as req,
+        pytest.raises(NassError, match='not a public address'),
+    ):
+        make_client().create_transaction(
+            '11791458071', 1000, return_url=return_url, callback_url=callback_url
+        )
+
+    req.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    'url',
+    [
+        'https://lavender.fashion/payment/return',
+        'https://lavender.support/api/nass/callback/',
+        'http://8.8.8.8/cb/',
+    ],
+)
+def test_public_urls_are_sent(url):
+    with patch('nass_payment.client.requests.request', return_value=answer(201)) as req:
+        make_client().create_transaction(
+            '11791458071', 1000, return_url=url, callback_url=url
+        )
+
+    assert req.call_args.kwargs['json']['backRef'] == url
 
 
 # -- reading the status --------------------------------------------------------

@@ -4,6 +4,20 @@ All notable changes to this package. Projects pin a tag, so read every entry
 between your tag and the new one before upgrading, and do what its
 **Upgrade notes** say. How to release and how to upgrade: [UPDATING.md](UPDATING.md).
 
+## v0.1.2
+
+- Fixed: a return or callback URL that is not a public address (`localhost`,
+  `127.0.0.1`, a private IP, a `.local` / `.test` domain) is refused with a
+  `NassError` before anything is sent. Nass created such a transaction, then
+  the payment failed at "Pay Now" with a "404 Not Found!" page, so a payment
+  started from a local machine could never be completed.
+- Added: `client.is_local_url(url)`.
+
+Upgrade notes:
+
+- Set `NASS_RETURN_URL` and `NASS_CALLBACK_URL` to public addresses wherever
+  the project builds them from a local request, development included.
+
 ## v0.1.1
 
 - Fixed: the log line for a completed or failed payment names the order from

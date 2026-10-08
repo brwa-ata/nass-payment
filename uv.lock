@@ -278,7 +278,7 @@ wheels = [
 
 [[package]]
 name = "nass-payment"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "django", version = "5.2.18", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
