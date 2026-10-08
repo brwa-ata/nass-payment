@@ -4,6 +4,14 @@ All notable changes to this package. Projects pin a tag, so read every entry
 between your tag and the new one before upgrading, and do what its
 **Upgrade notes** say. How to release and how to upgrade: [UPDATING.md](UPDATING.md).
 
+## v0.1.1
+
+- Fixed: the log line for a completed or failed payment names the order from
+  the receipt. It read the order from Nass's status answer and printed
+  `None` when that answer did not repeat it.
+
+Upgrade notes: none.
+
 ## v0.1.0
 
 First release: Nass Payment Gateway card payments for Django, built against

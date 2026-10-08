@@ -32,7 +32,7 @@ update.
 
 | Project | Where the pin lives | Current tag |
 | --- | --- | --- |
-| Lavender (`lavender-system`) | `pyproject.toml` (`[tool.uv.sources]`) | `v0.1.0` |
+| Lavender (`lavender-system`) | `pyproject.toml` (`[tool.uv.sources]`) | `v0.1.1` |
 
 ---
 

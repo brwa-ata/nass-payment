@@ -77,3 +77,21 @@ def test_the_level_is_a_setting(settings, tmp_path):
     logs.configure()
 
     assert logs.logger.level == logging.WARNING
+
+
+@pytest.mark.django_db
+def test_a_completion_is_logged_with_the_receipts_order(settings, tmp_path, nass):
+    """Nass's status may not repeat the orderId; the receipt always has it."""
+    set_log_file(settings, tmp_path / 'nass.log')
+    logs.configure()
+    receipt = Receipt.objects.create(amount=1, ref_no='11791458071')
+
+    service.apply_status(
+        receipt, {'actionCode': '0', 'responseCode': '00', 'rrn': '628112345678'}
+    )
+
+    text = (tmp_path / 'nass.log').read_text()
+    assert (
+        f'Nass payment 11791458071 for receipt {receipt.pk} marked completed '
+        '(rrn 628112345678)'
+    ) in text

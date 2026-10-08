@@ -132,7 +132,7 @@ def apply_status(receipt, status):
             _run_hook(conf.on_completed, locked, status)
             logger.info(
                 'Nass payment %s for receipt %s marked completed (rrn %s)',
-                status.get('orderId'),
+                getattr(receipt, conf.ref_field),
                 receipt.pk,
                 status.get('rrn'),
             )
@@ -146,7 +146,7 @@ def apply_status(receipt, status):
         _run_hook(conf.on_failed, receipt, status)
         logger.info(
             'Nass payment %s for receipt %s failed: %s %s',
-            status.get('orderId'),
+            getattr(receipt, conf.ref_field),
             receipt.pk,
             status.get('responseCode'),
             status.get('statusMsg'),
